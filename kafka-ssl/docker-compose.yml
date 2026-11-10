@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  kafka:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: my-kafka-ssl:3.7.0
+    container_name: kafka-ssl
+    hostname: kafka-broker
+    ports:
+      - "9093:9093"
+    environment:
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+      CERTS_DIR: "/opt/kafka-certs"
+      CA_PASS: "capassword"
+      BROKER_PASS: "brokerpass"
+      TRUST_PASS: "trustpass"
+      CLIENT_PASS: "clientpass"
+      BROKER_CN: "kafka-broker"
+      BROKER_SAN: "DNS:localhost,DNS:kafka-broker,IP:127.0.0.1"
+      GENERATE_CLIENT_CERT: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+      - kafka-certs:/opt/kafka-certs
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/9093' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - kafka-net
+
+
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    container_name: kafdrop
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: "kafka-broker:9093"
+      JVM_OPTS: "-Xms32M -Xmx128M"
+      KAFKA_PROPERTIES_FILE: "/tmp/kafka.properties"
+    volumes:
+      - kafka-certs:/tmp/kafka-certs:ro
+      - ./kafka.properties:/tmp/kafka.properties:ro
+    networks:
+      - kafka-net
+
+
+volumes:
+  kafka-data:
+  kafka-certs:
+
+networks:
+  kafka-net:
+    driver: bridge
+
