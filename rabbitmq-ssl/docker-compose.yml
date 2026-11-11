@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  rabbitmq-ssl:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq-ssl
+    ports:
+      - "5671:5671"   # AMQP over SSL/TLS
+      - "15671:15671" # Management UI over SSL/TLS
+    volumes:
+      - ./rabbitmq-ssl/data:/var/lib/rabbitmq
+      - ./rabbitmq-ssl/certs:/etc/rabbitmq/certs
+      - ./rabbitmq-ssl/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    restart: unless-stopped
+    networks:
+      - rabbitmq-network
+
+networks:
+  rabbitmq-network:
+    driver: bridge
