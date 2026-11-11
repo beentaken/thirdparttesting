@@ -1,0 +1,83 @@
+services:
+  certgen:
+    image: alpine:3.20
+    container_name: redis-certgen
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        mkdir -p /certs && cd /certs
+        if [ -f ca.crt ] && [ -f redis.crt ] && [ -f client.crt ] && [ "$${FORCE:-0}" != "1" ]; then
+          echo "[certgen] certs exist — skipping"; exit 0
+        fi
+        apk add --no-cache openssl >/dev/null
+        echo "[certgen] Generating CA"
+        openssl genrsa -out ca.key 4096
+        openssl req -x509 -new -nodes -sha256 -days 3650 -key ca.key -out ca.crt \
+          -subj "/C=SG/ST=Singapore/L=Singapore/O=MyOrg/OU=CA/CN=MyRedisCA"
+        echo "[certgen] Generating Server Cert"
+        openssl genrsa -out redis.key 4096
+        openssl req -new -sha256 -key redis.key -out redis.csr \
+          -subj "/C=SG/ST=Singapore/L=Singapore/O=MyOrg/OU=Redis/CN=redis"
+        printf '%s\n' \
+          'basicConstraints = CA:FALSE' \
+          'keyUsage = digitalSignature, keyEncipherment' \
+          'extendedKeyUsage = serverAuth, clientAuth' \
+          'subjectAltName = @alt_names' \
+          '' \
+          '[alt_names]' \
+          'DNS.1 = redis' \
+          'DNS.2 = localhost' \
+          'IP.1 = 127.0.0.1' > redis.ext
+        openssl x509 -req -sha256 -days 3650 -in redis.csr -CA ca.crt -CAkey ca.key \
+          -CAcreateserial -out redis.crt -extfile redis.ext
+        echo "[certgen] Generating Client Cert"
+        openssl genrsa -out client.key 4096
+        openssl req -new -sha256 -key client.key -out client.csr \
+          -subj "/C=SG/ST=Singapore/L=Singapore/O=MyOrg/OU=Client/CN=celery-client"
+        printf '%s\n' \
+          'basicConstraints = CA:FALSE' \
+          'keyUsage = digitalSignature, keyEncipherment' \
+          'extendedKeyUsage = clientAuth' > client.ext
+        openssl x509 -req -sha256 -days 3650 -in client.csr -CA ca.crt -CAkey ca.key \
+          -CAcreateserial -out client.crt -extfile client.ext
+        chmod 600 *.key && chmod 644 *.crt
+        echo "[certgen] Done"
+    environment:
+      - FORCE=${FORCE:-0}
+    volumes:
+      - ./certs:/certs
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-tls
+    depends_on:
+      certgen:
+        condition: service_completed_successfully
+    # Option A: use redis.conf as-is (password hardcoded in redis.conf)
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    # Option B: override password via env (remove requirepass from redis.conf first)
+    # command:
+    #   - sh
+    #   - -c
+    #   - >
+    #     exec redis-server /usr/local/etc/redis/redis.conf
+    #     --requirepass "$${REDIS_PASSWORD}"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./certs:/etc/redis/certs:ro
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /etc/redis/certs/ca.crt -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  redis-data:
