@@ -1,0 +1,19 @@
+{
+  "ibm_mq": {
+    "queueManager": "QM1",
+    "channel": "SVRCONN",
+    "host": "localhost",
+    "port": 1414,
+    "username": "admin",
+    "password": "password",
+    "ssl": true,
+    "sslKeyRepository": "/opt/mqm/qmgrs/QM1/ssl/key.kdb",
+    "sslTrustRepository": "/opt/mqm/qmgrs/QM1/ssl/trust.kdb",
+    "sslKeyRepositoryPassword": "password"
+  },
+  "references": {
+    "redis_connection": "../redis/src/connection.js",
+    "kafka_integration": "../kafka/src/integration.js",
+    "database": "../database/config.js"
+  }
+}

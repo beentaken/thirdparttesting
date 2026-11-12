@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  ibmmq:
+    image: ibmcom/mq:latest
+    container_name: ibmmq
+    environment:
+      - LICENSE=accept
+      - MQ_QMGR_NAME=QM1
+      - MQ_APP_PASSWORD=password
+      - MQ_USERNAME=admin
+      - MQ_PASSWORD=password
+      - MQ_SSL_KEYSTORE=/opt/mqm/qmgrs/QM1/ssl/key.kdb
+      - MQ_SSL_TRUSTSTORE=/opt/mqm/qmgrs/QM1/ssl/trust.kdb
+    ports:
+      - "1414:1414"
+      - "9443:9443"
+    volumes:
+      - ./mq-ssl.conf:/etc/mqm/mq-ssl.conf
+      - mq-data:/var/mqm
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9443/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mq-data:
