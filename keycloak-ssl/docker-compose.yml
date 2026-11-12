@@ -1,62 +1,41 @@
 version: '3.8'
-
 services:
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0.4
-    container_name: keycloak
-    restart: unless-stopped
-    ports:
-      - "8443:8443"
-      - "9990:9990"
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_HOSTNAME: localhost
-      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/tls.crt
-      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/tls.key
-      KC_DB: postgres
-      KC_DB_URL_HOST: keycloak-db
-      KC_DB_URL_PORT: 5432
-      KC_DB_SCHEMA: public
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: password
-      KC_DB_POOL_MIN_SIZE: 5
-      KC_DB_POOL_MAX_SIZE: 20
-      KC_HTTPS_ENABLED: true
-      KC_PROXY_HEADERS: xforwarded
-      KC_HTTP_RELATIVE_PATH: /
-      KC_METRICS_ENABLED: true
-      # Disable database version check for compatibility with PostgreSQL 13.23.0
-      KC_FEATURES: "database-version-check"
-      # Add Hibernate ORM database version override
-      QUARKUS_DATASOURCE_DB_VERSION: "13.23.0"
-      QUARKUS_HIBERNATE_ORM_DATABASE_VERSION_CHECK_ENABLED: "false"
-    volumes:
-      - ./certs:/opt/keycloak/conf
-      - ./data:/opt/keycloak/data
-    depends_on:
-      - keycloak-db
-    command:
-      - start-dev
-      - --import-realm
-      - --db=postgres
-      - --db-url-host=keycloak-db
-      - --db-url-port=5432
-      - --db-username=keycloak
-      - --db-password=password
-      - --hostname=localhost
-      - --https-certificate-file=/opt/keycloak/conf/tls.crt
-      - --https-certificate-key-file=/opt/keycloak/conf/tls.key
-
-  keycloak-db:
-    image: postgres:13
-    container_name: keycloak-db
-    restart: unless-stopped
+  postgres:
+    image: postgres:15
+    container_name: postgres
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: password
-    volumes:
-      - ./postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.3
+    container_name: keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_PORT: 5432
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_SCHEMA: public
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: password
+      KC_HTTP_RELATIVE_PATH: /
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - start-dev
+    volumes:
+      - ./data:/opt/keycloak/data

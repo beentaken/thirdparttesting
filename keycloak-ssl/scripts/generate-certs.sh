@@ -1,30 +1,36 @@
 #!/bin/bash
 
-# Generate self-signed certificates for Keycloak SSL
-echo "Generating self-signed certificates for Keycloak..."
+echo "Generating Keycloak SSL certificates..."
 
-# Create directory structure if it doesn't exist
-mkdir -p certs
+# Create certificate directory
+mkdir -p keycloak-ssl/certs
 
-# Check if certificates already exist
-if [ -f certs/tls.crt ] && [ -f certs/tls.key ]; then
-    echo "Certificates already exist. Skipping generation."
-    exit 0
-fi
+cd keycloak-ssl/certs
 
-# Generate private key
-echo "Generating private key..."
-openssl genrsa -out certs/tls.key 2048
+# Generate CA certificate
+echo "Creating CA certificate..."
+openssl genrsa -out ca.key 2048
+openssl req -new -x509 -key ca.key -out ca.crt -days 365 -subj "/C=US/ST=State/L=City/O=Keycloak/CN=ca.keycloak"
 
-# Generate certificate with proper subject
-echo "Generating certificate..."
-openssl req -new -x509 -key certs/tls.key -out certs/tls.crt -days 365 -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost" -nodes
+# Generate server certificate
+echo "Creating server certificate..."
+openssl genrsa -out tls.key 2048
+openssl req -new -key tls.key -out tls.csr -subj "/C=US/ST=State/L=City/O=Keycloak/CN=localhost"
+
+# Sign the certificate with CA
+echo "Signing server certificate..."
+openssl x509 -req -in tls.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out tls.crt -days 365
+
+# Create PKCS12 truststore for Keycloak
+echo "Creating truststore..."
+openssl pkcs12 -export -inkey tls.key -in tls.crt -out truststore.p12 -passout pass:changeit -name keycloak
 
 # Set proper permissions
-chmod 600 certs/tls.key
-chmod 644 certs/tls.crt
+chmod 600 tls.key
+chmod 644 tls.crt
+chmod 644 ca.crt
+chmod 600 truststore.p12
 
 echo "Certificates generated successfully!"
 echo "Files created:"
-echo "  - certs/tls.key"
-echo "  - certs/tls.crt"
+ls -la

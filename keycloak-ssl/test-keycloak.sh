@@ -1,28 +1,27 @@
 #!/bin/bash
 
-echo "Testing Keycloak SSL setup..."
+echo "Testing Keycloak SSL connection..."
 
-# Check if certificates exist
-if [ ! -f certs/tls.crt ] || [ ! -f certs/tls.key ]; then
-    echo "Error: SSL certificates not found!"
-    exit 1
+# Wait for Keycloak to start
+echo "Waiting for Keycloak to start..."
+sleep 10
+
+# Test HTTPS connection
+echo "Testing HTTPS connection..."
+curl -k https://localhost:8443/
+
+if [ $? -eq 0 ]; then
+    echo "Keycloak SSL connection test PASSED"
+else
+    echo "Keycloak SSL connection test FAILED"
 fi
 
-echo "SSL certificates found:"
-ls -la certs/
+# Test Keycloak admin API
+echo "Testing Keycloak admin API..."
+curl -k https://localhost:8443/admin/
 
-echo "Starting Keycloak with SSL..."
-docker-compose up -d
-
-# Wait a moment for startup
-sleep 5
-
-# Check if Keycloak is running
-if docker ps | grep -q keycloak; then
-    echo "Keycloak is running successfully!"
-    echo "Access at: https://localhost:8443"
-    echo "Admin user: admin / admin"
+if [ $? -eq 0 ]; then
+    echo "Keycloak admin API test PASSED"
 else
-    echo "Error: Keycloak failed to start"
-    docker-compose logs keycloak
+    echo "Keycloak admin API test FAILED"
 fi

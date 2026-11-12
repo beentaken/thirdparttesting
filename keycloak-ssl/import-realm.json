@@ -1,0 +1,36 @@
+{
+    "id": "test-realm",
+    "realm": "test-realm",
+    "enabled": true,
+    "users": [
+        {
+            "username": "admin",
+            "email": "admin@example.com",
+            "enabled": true,
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "admin"
+                }
+            ],
+            "realmRoles": ["admin"]
+        }
+    ],
+    "roles": {
+        "realm": [
+            {
+                "name": "admin",
+                "description": "Administrator role"
+            }
+        ]
+    },
+    "clients": [
+        {
+            "clientId": "test-client",
+            "enabled": true,
+            "publicClient": true,
+            "redirectUris": ["*"],
+            "webOrigins": ["*"]
+        }
+    ]
+}

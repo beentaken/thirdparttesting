@@ -1,21 +1,13 @@
 #!/bin/bash
 
-# Create a truststore with the self-signed certificate
-echo "Creating truststore..."
+echo "Creating Keycloak truststore..."
 
-# First create a temporary keystore to import the certificate
-keytool -genkey -keystore /tmp/temp-keystore.jks -storepass password -keypass password -dname "CN=localhost, OU=IT, O=Organization, L=City, S=State, C=US" -alias temp-key
+# Create directory if it doesn't exist
+mkdir -p keycloak-ssl/certs
 
-# Import the certificate into a truststore
-keytool -importcert \
-  -file /opt/keycloak/conf/tls.crt \
-  -keystore /opt/keycloak/conf/truststore.p12 \
-  -storetype PKCS12 \
-  -storepass password \
-  -alias keycloak-cert \
-  -noprompt
+cd keycloak-ssl/certs
 
-# Clean up
-rm -f /tmp/temp-keystore.jks
+# Create a simple truststore with the CA certificate
+keytool -importcert -file ca.crt -keystore truststore.jks -storepass changeit -noprompt -alias ca-keycloak
 
-echo "Truststore created successfully"
+echo "Truststore created successfully!"
