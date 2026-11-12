@@ -1,68 +1,93 @@
-# Gaia Chat Application - Third Party Services Setup
+# Third Party Services Setup
 
-This repository contains configuration files and setup instructions for third-party services used in the gaia-chat-app.
+This repository contains configuration files and scripts to set up various third-party services including Keycloak, PostgreSQL, Redis, and Kafka.
 
-## Directory Structure
+## Services Included
 
-```
-.
-├── redis-ssl/           # Redis with SSL/TLS configuration
-├── ibmmq/               # IBM MQ configuration
-├── keycloak-ssl/        # Keycloak with SSL configuration
-└── README.md            # This file
-```
+### 1. Keycloak
+- **Version**: 24.0.4 (Quarkus-based)
+- **Database**: PostgreSQL 13.23.0
+- **Port**: 8443 (HTTPS)
+- **Admin Credentials**: admin / admin
 
-## Services Setup
+### 2. PostgreSQL
+- **Version**: 13.23.0
+- **Port**: 5432
+- **Database**: keycloak
+- **User**: keycloak
+- **Password**: password
 
-### 1. Redis with SSL
-Located in `redis-ssl/` directory:
-- Docker Compose configuration for Redis with TLS support
-- SSL certificate generation scripts
-- Basic Redis configuration with authentication
+## Setup Instructions
 
-### 2. IBM MQ
-Located in `ibmmq/` directory:
-- Docker Compose configuration for IBM MQ
-- SSL configuration files
-- Connection configuration referencing other components
+### Prerequisites
+- Docker and Docker Compose installed
+- OpenSSL (for certificate generation)
 
-### 3. Keycloak with SSL
-Located in `keycloak-ssl/` directory:
-- Docker Compose configuration for Keycloak with HTTPS
-- SSL certificate generation scripts
-- Realm configuration for chat application
-
-## Getting Started
-
-1. **Redis Setup:**
+### Keycloak Setup
 ```bash
-cd redis-ssl
-# Follow instructions in redis-ssl/README.md
-```
-
-2. **IBM MQ Setup:**
-```bash
-cd ibmmq
-# Follow instructions in ibmmq/README.md
-```
-
-3. **Keycloak Setup:**
-```bash
+# Navigate to Keycloak directory
 cd keycloak-ssl
-./scripts/generate-certs.sh
-docker-compose up -d
+
+# Make setup script executable and run it
+chmod +x setup-keycloak.sh
+./setup-keycloak.sh
 ```
 
-## Security Notes
+### Manual Certificate Generation (if needed)
+```bash
+# Generate certificates manually
+mkdir -p certs
+openssl genrsa -out certs/tls.key 2048
+openssl req -new -x509 -key certs/tls.key -out certs/tls.crt -days 365 -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
+chmod 600 certs/tls.key
+chmod 644 certs/tls.crt
+```
 
-- SSL certificates in development environments are self-signed
-- Production deployments should use valid SSL certificates from a trusted CA
-- All services use default passwords for demonstration purposes only
-- Configure appropriate security settings before production deployment
+### Start Services
+```bash
+# Start all services using docker-compose
+docker-compose up -d
 
-## References
+# View logs
+docker-compose logs -f
+```
 
-This setup references components from:
-- `src/connection.js` (Redis connection)
-- `kafka/src/integration.js` (Kafka integration)
-- Database configurations in `database/config.js`
+## Keycloak Configuration Notes
+
+- The setup handles database version compatibility issues with PostgreSQL 13.23.0
+- HTTPS is enabled by default
+- Realm import is configured automatically
+- Database version check has been disabled to prevent compatibility errors
+
+## Troubleshooting
+
+### Database Version Issues
+The setup now includes proper configuration to handle PostgreSQL 13.23.0:
+```yaml
+QUARKUS_HIBERNATE_ORM_DATABASE_VERSION_CHECK_ENABLED: "false"
+```
+
+### Certificate Issues
+If certificate issues occur, regenerate certificates:
+```bash
+rm -rf certs/*
+./scripts/generate-certs.sh
+```
+
+### Docker Image Issues
+If you encounter image resolution problems:
+```bash
+docker pull quay.io/keycloak/keycloak:24.0.4
+docker pull postgres:13.23.0
+```
+
+## Access Information
+
+- **Keycloak Admin Console**: https://localhost:8443
+- **PostgreSQL**: localhost:5432
+- **Admin User**: admin
+- **Admin Password**: admin
+
+## Security Note
+
+This setup is intended for development and testing purposes only. Do not use these configurations in production without proper security hardening.
