@@ -1,0 +1,33 @@
+# Redis configuration for SSL/TLS
+bind 0.0.0.0
+port 6379
+
+# Enable TLS
+tls-port 6379
+tls-cert-file /etc/redis/certs/redis.crt
+tls-key-file /etc/redis/certs/redis.key
+tls-dh-params-file /etc/redis/certs/dh.pem
+tls-ca-cert-file /etc/redis/certs/ca.crt
+
+# Require client certificates (set to yes if you want mutual TLS)
+tls-auth-clients no
+
+# Set minimum TLS version
+tls-minimum-version 1.2
+
+# Enable SSL for replication
+repl-tls-port 6379
+repl-tls-cert-file /etc/redis/certs/redis.crt
+repl-tls-key-file /etc/redis/certs/redis.key
+repl-tls-dh-params-file /etc/redis/certs/dh.pem
+repl-tls-ca-cert-file /etc/redis/certs/ca.crt
+
+# Require client certificates for replication (optional)
+repl-tls-auth-clients no
+
+# Log level
+loglevel notice
+logfile /var/log/redis/redis-server.log
+
+# Set to use the data directory for persistence
+dir /data
