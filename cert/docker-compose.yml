@@ -1,0 +1,23 @@
+services:
+  cert-generator:
+    image: alpine:latest
+    container_name: cert-generator
+    volumes:
+      - ./certs:/certs          # Mount the named volume as usual
+    command: >
+      sh -c "
+        apk add --no-cache openssl &&
+        openssl req -new -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout /certs/tls.key
+        -out /certs/tls.crt
+        -subj '/C=US/ST=State/L=City/O=Organization/CN=localhost'
+      "
+    restart: "no"
+
+volumes:
+  certs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./certs          # The path on your host
