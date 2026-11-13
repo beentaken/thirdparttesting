@@ -3,15 +3,14 @@ services:
     image: alpine:latest
     container_name: cert-generator
     volumes:
-      - ./certs:/certs          # Mount the named volume as usual
+      - ./certs:/certs
     command: >
-      sh -c "
-        apk add --no-cache openssl &&
-        openssl req -new -x509 -nodes -days 365 -newkey rsa:2048
-        -keyout /certs/tls.key
-        -out /certs/tls.crt
-        -subj '/C=US/ST=State/L=City/O=Organization/CN=localhost'
-      "
+      apk add --no-cache openssl &&
+      openssl req -new -x509 -nodes -days 365 -newkey rsa:2048
+      -keyout /certs/tls.key
+      -out /certs/tls.crt
+      -subj '/C=US/ST=State/L=City/O=Organization/CN=localhost'
+      -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'
     restart: "no"
 
 volumes:
@@ -20,4 +19,4 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ./certs          # The path on your host
+      device: certs
