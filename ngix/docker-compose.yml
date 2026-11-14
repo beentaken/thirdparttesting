@@ -1,23 +1,21 @@
-
+version: '3.8'
 services:
   # 1. Generate self-signed HTTPS certificate
   cert-generator:
     image: alpine:latest
-    container_name: cert-generator
-    volumes:
-      - ./certs:/certs
-    entrypoint: ["/bin/sh", "-c"]
     command: |
-      apk add --no-cache openssl &&
-      openssl req -new -x509 -nodes -days 365 \
-        -newkey rsa:2048 \
-        -keyout /certs/tls.key \
-        -out /certs/tls.crt \
-        -subj '/C=SG/ST=Singapore/L=Singapore/O=Organization/CN=localhost' \
-        -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' &&
-      chmod 644 /certs/tls.crt &&
-      chmod 600 /certs/tls.key
-    restart: "no"
+      sh -c "
+        apk add --no-cache openssl &&
+        mkdir -p /etc/ssl/certs /etc/ssl/private &&
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 
+        -keyout /etc/ssl/private/nginx-selfsigned.key 
+        -out /etc/ssl/certs/nginx-selfsigned.crt 
+        -subj '/C=US/ST=State/L=City/O=Organization/CN=yourdomain.com'
+      "
+    volumes:
+      - ./certs:/etc/ssl/certs
+      - ./certs:/etc/ssl/private
+    restart: unless-stopped
 
   # 2. Nginx HTTPS reverse proxy
   nginx:
@@ -44,4 +42,3 @@ services:
     expose:
       - "8000"
     restart: unless-stopped
-

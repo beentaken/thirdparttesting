@@ -1,22 +1,27 @@
 services:
   cert-generator:
-    image: alpine:latest
-    container_name: cert-generator
+    image: alpine:3.20
+    container_name: certgen
     volumes:
-      - ./certs:/certs
-    command: >
-      apk add --no-cache openssl &&
-      openssl req -new -x509 -nodes -days 365 -newkey rsa:2048
-      -keyout /certs/tls.key
-      -out /certs/tls.crt
-      -subj '/C=US/ST=State/L=City/O=Organization/CN=localhost'
-      -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'
+      - ./cert:/out            # bind → host ./cert (inspect / backup)
+      - certs:/certs           # named volume → reused by api & client
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        apk add --no-cache openssl >/dev/null
+        mkdir -p /certs /out
+        openssl req -x509 -newkey rsa:4096 -nodes \
+          -keyout /certs/key.pem \
+          -out    /certs/cert.pem \
+          -days 365 \
+          -subj "/C=US/ST=State/L=City/O=Org/CN=localhost" \
+          -addext "subjectAltName=DNS:localhost,DNS:api,IP:127.0.0.1"
+        chmod 600 /certs/key.pem
+        # copy into host bind so you can inspect / commit-free backup
+        cp /certs/cert.pem /certs/key.pem /out/
+        echo "✅ certs written to volume 'certs' AND host ./cert"
     restart: "no"
 
 volumes:
   certs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: certs
