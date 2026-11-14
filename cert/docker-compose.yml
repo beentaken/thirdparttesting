@@ -1,5 +1,7 @@
 services:
-  cert-generator:
+
+  # ---- 1. Generate certs inside container, publish to host + volume ----
+  certgen:
     image: alpine:3.20
     container_name: certgen
     volumes:
