@@ -1,8 +1,13 @@
-version: '3.8'
+
 services:
+
+  # -----------------------------------
+  # PostgreSQL
+  # -----------------------------------
   postgres:
     image: postgres:15
     container_name: postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
@@ -10,7 +15,6 @@ services:
     ports:
       - "5432:5432"
     volumes:
-    #  - ./postgres-data:/var/lib/postgresql/data
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
@@ -18,9 +22,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # -----------------------------------
+  # Generate SSL Certificate
+  # -----------------------------------
+  cert-generator:
+    image: alpine:3.20
+    container_name: keycloak-cert-generator
+    volumes:
+      - keycloak-certs:/certs
+      - ./certs/generate-certs.sh:/generate-certs.sh:ro
+    entrypoint: ["/bin/sh", "/generate-certs.sh"]
+    restart: "no"
+
+  # -----------------------------------
+  # Keycloak
+  # -----------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.3
     container_name: keycloak
+    restart: unless-stopped
+
     environment:
       KC_DB: postgres
       KC_DB_URL_HOST: postgres
@@ -29,20 +50,38 @@ services:
       KC_DB_SCHEMA: public
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: password
+
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+
+      KC_HOSTNAME: localhost
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+      KC_HTTPS_PORT: 8443
+
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/certs/tls.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/certs/tls.key
+
     ports:
       - "8080:8080"
       - "8443:8443"
+
     depends_on:
       postgres:
         condition: service_healthy
+      cert-generator:
+        condition: service_completed_successfully
+
     command:
       - start-dev
+      - --import-realm
+
     volumes:
-      #- ./data:/opt/keycloak/data
-      - data:/opt/keycloak/data
+      - keycloak-data:/opt/keycloak/data
+      - keycloak-certs:/opt/keycloak/conf/certs:ro
+      - ./import-realm.json:/opt/keycloak/data/import/realm.json:ro
 
 volumes:
-  data:    
   postgres-data:
+  keycloak-data:
+  keycloak-certs:

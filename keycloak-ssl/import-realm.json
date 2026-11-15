@@ -1,36 +1,31 @@
+
 {
-    "id": "test-realm",
-    "realm": "test-realm",
-    "enabled": true,
-    "users": [
+  "id": "test-realm",
+  "realm": "test-realm",
+  "enabled": true,
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "credentials": [
         {
-            "username": "admin",
-            "email": "admin@example.com",
-            "enabled": true,
-            "credentials": [
-                {
-                    "type": "password",
-                    "value": "admin"
-                }
-            ],
-            "realmRoles": ["admin"]
+          "type": "password",
+          "value": "admin",
+          "temporary": false
         }
-    ],
-    "roles": {
-        "realm": [
-            {
-                "name": "admin",
-                "description": "Administrator role"
-            }
-        ]
-    },
-    "clients": [
-        {
-            "clientId": "test-client",
-            "enabled": true,
-            "publicClient": true,
-            "redirectUris": ["*"],
-            "webOrigins": ["*"]
-        }
+      ],
+      "realmRoles": [
+        "admin"
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Admin role"
+      }
     ]
+  },
+  "clients": []
 }
