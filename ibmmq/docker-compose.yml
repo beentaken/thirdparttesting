@@ -12,6 +12,7 @@ services:
       - MQ_PASSWORD=password
       - MQ_SSL_KEYSTORE=/opt/mqm/qmgrs/QM1/ssl/key.kdb
       - MQ_SSL_TRUSTSTORE=/opt/mqm/qmgrs/QM1/ssl/trust.kdb
+      - MQ_ENABLE_CHANNEL_SECURITY=true
     ports:
       - "1414:1414"
       - "9443:9443"
@@ -23,6 +24,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    command: |
+      bash -c "
+        /opt/mqm/bin/runmqserver &
+        sleep 5
+        runmqsc QM1 << 'MQSC'
+          ALTER QMGR CONNAUTH('SYSTEM.DEFAULT.AUTHINFO')
+          DEFINE AUTHINFO(SYSTEM.DEFAULT.AUTHINFO) AUTHTYPE(IDPWOS) CHCKCLNT(REQDADM)
+          REFRESH SECURITY
+          START CHANNEL(SYSTEM.DEF.SVRCONN)
+        MQSC
+      "
 
 volumes:
   mq-data:
+
