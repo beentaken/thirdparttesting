@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # This service generates the certificate using OpenSSL
+  cert-generator:
+    image: alpine/openssl:latest
+    container_name: minio-cert-gen
+    volumes:
+      - minio-certs:/certs
+    entrypoint: >
+      /bin/sh -c "
+      if [ -f /certs/public.crt ] && [ -f /certs/private.key ]; then
+        echo 'Certificate already exists, skipping.';
+        exit 0;
+      fi;
+      openssl req -x509 -nodes -days 3650 -newkey rsa:2048
+      -keyout /certs/private.key
+      -out /certs/public.crt
+      -subj '/CN=minio.local'
+      -addext 'subjectAltName=DNS:localhost,DNS:minio,DNS:minio.local,IP:127.0.0.1';
+      chmod 644 /certs/public.crt;
+      chmod 600 /certs/private.key;
+      echo 'Certificate generated.';
+      "
+    restart: "no"
+
+  # MinIO uses the certificate from the shared volume
+  minio:
+    image: pgsty/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001" --certs-dir /certs
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: your-strong-password
+    volumes:
+      - ./minio-data:/data
+      - minio-certs:/certs:ro
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+
+volumes:
+  minio-certs:
