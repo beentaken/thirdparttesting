@@ -1,0 +1,17 @@
+
+
+sudo cp ./certs/keycloak.crt \
+  /usr/local/share/ca-certificates/keycloak.crt
+sudo update-ca-certificates
+curl -v https://localhost:8443
+curl -vk https://localhost:8443
+
+4. Firefox
+If curl works without -k but Firefox still shows a warning:
+1. Open about:preferences#privacy.
+2. Go to Certificates.
+3. Click View Certificates.
+4. Select Authorities.
+5. Import certs/keycloak.crt.
+6. Enable Trust this CA to identify websites.
+7. Restart Firefox.
