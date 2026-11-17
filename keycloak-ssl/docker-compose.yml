@@ -1,105 +1,71 @@
 services:
-
-  # ==========================================
-  # 1. OpenSSL Certificate Generator
-  # ==========================================
   cert-generator:
     image: alpine:latest
-    container_name: keycloak-cert-generator
-
+    volumes:
+      - ./certs:/certs
     entrypoint: ["/bin/sh", "-c"]
-
     command:
       - |
-        set -eux
-
-        echo "Installing OpenSSL..."
-
-        apk update
-        apk add --no-cache openssl
-
-        echo "Checking certificate directory..."
-
+        set -e
+        apk add --no-cache openssl >/dev/null
         mkdir -p /certs
-
-        if [ -s /certs/tls.crt ] && [ -s /certs/tls.key ]; then
-          echo "Existing certificates found."
-
-        else
-          echo "Generating new SSL certificates..."
-
-          openssl req -x509 -nodes -days 365 \
-            -newkey rsa:2048 \
-            -keyout /certs/tls.key \
-            -out /certs/tls.crt \
-            -subj "/CN=localhost" \
-            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,DNS:keycloak"
-
-          echo "Setting permissions..."
-
-          chmod 644 /certs/tls.crt
-          chmod 640 /certs/tls.key
-
-          chown 1000:0 /certs/tls.crt /certs/tls.key
-
-          echo "Certificate generated successfully."
+        if [ ! -f /certs/tls.crt ] || [ ! -f /certs/tls.key ]; then
+          openssl genrsa -out /certs/tls.key 2048
+          openssl req -new -key /certs/tls.key -out /certs/cert.csr \
+            -subj "/C=SG/ST=Singapore/L=Singapore/O=Development/OU=Keycloak/CN=localhost" -batch
+          cat > /certs/ext.cnf <<'EOF'
+        [v3_req]
+        basicConstraints = CA:FALSE
+        keyUsage = digitalSignature, keyEncipherment
+        extendedKeyUsage = serverAuth
+        subjectAltName = @alt_names
+        [alt_names]
+        DNS.1 = localhost
+        DNS.2 = keycloak
+        IP.1 = 127.0.0.1
+        IP.2 = ::1
+        EOF
+          openssl x509 -req -in /certs/cert.csr -signkey /certs/tls.key \
+            -out /certs/tls.crt -days 3650 -sha256 \
+            -extfile /certs/ext.cnf -extensions v3_req
+          rm -f /certs/cert.csr /certs/ext.cnf
         fi
+        chmod 644 /certs/tls.crt
+        chmod 644 /certs/tls.key   # relax for non-root keycloak in dev
 
-        echo "Verifying certificate..."
-
-        openssl x509 -in /certs/tls.crt -noout -subject
-        openssl pkey -in /certs/tls.key -noout -check
-
-        echo "Certificate setup completed."
-
-    volumes:
-      - keycloak-certs:/certs
-  # ==========================================
-  # 2. Keycloak
-  # ==========================================
   keycloak:
-    build:
-      context: .
-      dockerfile: Dockerfile
-
-    container_name: keycloak
-
+    build: { context: ., dockerfile: Dockerfile }
     depends_on:
       cert-generator:
         condition: service_completed_successfully
-
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin123
-
-      # HTTP
       KC_HTTP_ENABLED: "true"
-
-      # HTTPS
       KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/certs/tls.crt
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/certs/tls.key
-
-      # Keep management interface HTTP
-      # This avoids requiring a separate management TLS configuration.
       KC_HTTP_MANAGEMENT_SCHEME: http
-
-    ports:
-      - "8080:8080"
-      - "8443:8443"
-
+      # --- wire up postgres if you keep it ---
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+    ports: ["8080:8080", "8443:8443"]
     volumes:
-      - keycloak-certs:/opt/keycloak/conf/certs
+      - ./certs:/opt/keycloak/conf/certs   # <- matches cert-generator
       - keycloak-data:/opt/keycloak/data
-
     restart: unless-stopped
 
-# ==========================================
-# 3. Persistent Volumes
-# ==========================================
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
-
-  keycloak-certs:
-    name: keycloak-certs
-
   keycloak-data:
-    name: keycloak-data
+  postgres-data:
