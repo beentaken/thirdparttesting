@@ -1,41 +1,58 @@
-version: '3.8'
 
 services:
-  ibmmq:
-    image: ibmcom/mq:latest
-    container_name: ibmmq
-    environment:
-      - LICENSE=accept
-      - MQ_QMGR_NAME=QM1
-      - MQ_APP_PASSWORD=password
-      - MQ_USERNAME=admin
-      - MQ_PASSWORD=password
-      - MQ_SSL_KEYSTORE=/opt/mqm/qmgrs/QM1/ssl/key.kdb
-      - MQ_SSL_TRUSTSTORE=/opt/mqm/qmgrs/QM1/ssl/trust.kdb
-      - MQ_ENABLE_CHANNEL_SECURITY=true
+
+  # ----------------------------------------
+  # 1. SSL Certificate Generator
+  # ----------------------------------------
+  cert-generator:
+    build:
+      context: ./cert-generator
+      dockerfile: Dockerfile
+
+    container_name: mq-cert-generator
+
+    volumes:
+      - ./certs/mqweb:/certs
+
+    restart: "no"
+
+  # ----------------------------------------
+  # 2. IBM MQ Queue Manager
+  # ----------------------------------------
+  ibm-mq:
+    image: icr.io/ibm-messaging/mq:latest
+
+    container_name: ibm-mq
+    hostname: ibm-mq
+
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+
     ports:
       - "1414:1414"
       - "9443:9443"
+
+    environment:
+      LICENSE: accept
+
+      MQ_QMGR_NAME: QM1
+
+      MQ_ADMIN_USER: admin
+      MQ_ADMIN_PASSWORD: passw0rd
+
+      MQ_APP_USER: app
+      MQ_APP_PASSWORD: passw0rd
+
     volumes:
-      - ./mq-ssl.conf:/etc/mqm/mq-ssl.conf
-      - mq-data:/var/mqm
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9443/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    command: |
-      bash -c "
-        /opt/mqm/bin/runmqserver &
-        sleep 5
-        runmqsc QM1 << 'MQSC'
-          ALTER QMGR CONNAUTH('SYSTEM.DEFAULT.AUTHINFO')
-          DEFINE AUTHINFO(SYSTEM.DEFAULT.AUTHINFO) AUTHTYPE(IDPWOS) CHCKCLNT(REQDADM)
-          REFRESH SECURITY
-          START CHANNEL(SYSTEM.DEF.SVRCONN)
-        MQSC
-      "
+      # Generated SSL certificate
+      - ./certs/mqweb:/etc/mqm/pki/keys/mqweb:ro
+
+      # Persistent IBM MQ data
+      - mqdata:/mnt/mqm
+
+    restart: unless-stopped
 
 volumes:
-  mq-data:
-
+  mqdata:
+    name: ibm-mq-data
