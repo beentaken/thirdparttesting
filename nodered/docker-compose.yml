@@ -1,0 +1,29 @@
+services:
+  node-red:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: node-red
+
+    restart: unless-stopped
+
+    ports:
+      - "1880:1880"
+
+    env_file:
+      - .env
+
+    environment:
+      - TZ=${TZ:-Asia/Singapore}
+      - NODE_RED_ENABLE_PROJECTS=true
+
+    volumes:
+      - ./data:/data
+
+    networks:
+      - node-red-network
+
+networks:
+  node-red-network:
+    driver: bridge
