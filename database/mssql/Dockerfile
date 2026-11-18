@@ -1,7 +1,6 @@
-FROM mysql:8.4
+FROM mcr.microsoft.com/mssql/server:2022-latest
 
-LABEL maintainer="database-dev"
+LABEL maintainer="database-lab"
+LABEL database="mssql"
 
-COPY ./init/ /docker-entrypoint-initdb.d/
-
-EXPOSE 3306
+EXPOSE 1433
