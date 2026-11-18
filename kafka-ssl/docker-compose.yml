@@ -1,38 +1,58 @@
-version: "3.9"
-
 services:
-  kafka:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: my-kafka-ssl:3.7.0
-    container_name: kafka-ssl
-    hostname: kafka-broker
-    ports:
-      - "9093:9093"
+  cert-generator:
+    build: .
+    container_name: cert-generator
     environment:
-      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
-      CERTS_DIR: "/opt/kafka-certs"
-      CA_PASS: "capassword"
-      BROKER_PASS: "brokerpass"
-      TRUST_PASS: "trustpass"
-      CLIENT_PASS: "clientpass"
-      BROKER_CN: "kafka-broker"
-      BROKER_SAN: "DNS:localhost,DNS:kafka-broker,IP:127.0.0.1"
-      GENERATE_CLIENT_CERT: "true"
+      CERT_PASSWORD: changeit
+      BROKER_HOST: kafka
     volumes:
+      - certs:/certs
+
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: kafka
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+    ports:
+      - "29092:29092"   # external (host) SSL listener
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_LISTENERS: SSL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL,EXTERNAL:SSL,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+
+      # TLS - names resolved by the image under /etc/kafka/secrets
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.keystore.p12
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: keystore_creds
+      KAFKA_SSL_KEY_CREDENTIALS: key_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.truststore.p12
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: truststore_creds
+      KAFKA_SSL_KEYSTORE_TYPE: PKCS12
+      KAFKA_SSL_TRUSTSTORE_TYPE: PKCS12
+      KAFKA_SSL_CLIENT_AUTH: required   # mutual TLS; set to "none" to disable
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - certs:/etc/kafka/secrets:ro
+      - certs:/certs:ro   # used by the healthcheck / kafdrop.properties paths
       - kafka-data:/var/lib/kafka/data
-      - kafka-certs:/opt/kafka-certs
     healthcheck:
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/9093' || exit 1"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092 --command-config /certs/kafdrop.properties > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
       retries: 10
       start_period: 20s
-    networks:
-      - kafka-net
-
-
 
   kafdrop:
     image: obsidiandynamics/kafdrop:latest
@@ -43,21 +63,13 @@ services:
     ports:
       - "9000:9000"
     environment:
-      KAFKA_BROKERCONNECT: "kafka-broker:9093"
-      JVM_OPTS: "-Xms32M -Xmx128M"
-      KAFKA_PROPERTIES_FILE: "/tmp/kafka.properties"
+      KAFKA_BROKERCONNECT: kafka:9092
+      KAFKA_PROPERTIES_FILE: /certs/kafdrop.properties
+      JVM_OPTS: "-Xms32M -Xmx64M"
+      SERVER_SERVLET_CONTEXTPATH: "/"
     volumes:
-      - kafka-certs:/tmp/kafka-certs:ro
-      - ./kafka.properties:/tmp/kafka.properties:ro
-    networks:
-      - kafka-net
-
+      - certs:/certs:ro
 
 volumes:
+  certs:
   kafka-data:
-  kafka-certs:
-
-networks:
-  kafka-net:
-    driver: bridge
-

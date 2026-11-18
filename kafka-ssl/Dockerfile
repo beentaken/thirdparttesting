@@ -1,19 +1,11 @@
-FROM apache/kafka:3.9.1
+# Cert generator image: creates a CA, broker cert and client cert with OpenSSL
+FROM alpine:3.20
 
-USER root
+# openjdk jre provides keytool (used to build the PKCS12 truststore)
+RUN apk add --no-cache openssl bash openjdk17-jre-headless
 
-# UBI minimal/micro doesn't ship microdnf reliably — check and use what's there
-RUN set -eux; \
-    if command -v microdnf >/dev/null 2>&1; then \
-        microdnf install -y openssl tar gzip bash procps-ng findutils; \
-        microdnf clean all; \
-    elif command -v dnf >/dev/null 2>&1; then \
-        dnf install -y openssl tar gzip bash procps-ng findutils; \
-        dnf clean all; \
-    elif command -v yum >/dev/null 2>&1; then \
-        yum install -y openssl tar gzip bash procps-ng findutils; \
-        yum clean all; \
-    else \
-        echo "No package manager found — using preinstalled tools only"; \
-    fi; \
-    command -v openssl; command -v tar; command -v bash
+COPY generate-certs.sh /usr/local/bin/generate-certs.sh
+RUN chmod +x /usr/local/bin/generate-certs.sh
+
+VOLUME /certs
+ENTRYPOINT ["/usr/local/bin/generate-certs.sh"]
