@@ -1,22 +1,34 @@
-version: '3.8'
 services:
-  rabbitmq-ssl:
-    image: rabbitmq:3-management-alpine
-    container_name: rabbitmq-ssl
-    ports:
-      - "5671:5671"   # AMQP over SSL/TLS
-      - "15671:15671" # Management UI over SSL/TLS
-    volumes:
-      - ./rabbitmq-ssl/data:/var/lib/rabbitmq
-      - ./rabbitmq-ssl/certs:/etc/rabbitmq/certs
-      - ./rabbitmq-ssl/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+  # One-shot container: generates CA/server/client certs into ./certs, then exits
+  cert-generator:
+    image: alpine:3.20
+    container_name: rabbitmq-cert-generator
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    restart: unless-stopped
-    networks:
-      - rabbitmq-network
+      CERT_DIR: /certs
+      CERT_HOST: rabbitmq          # CN; SANs also include localhost and 127.0.0.1
+    volumes:
+      - ./gen-certs.sh:/gen-certs.sh:ro
+      - ./certs:/certs
+    command: sh -c "apk add --no-cache openssl bash >/dev/null && bash /gen-certs.sh"
+    restart: "no"
 
-networks:
-  rabbitmq-network:
-    driver: bridge
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+    ports:
+      - "5671:5671"
+      - "15671:15671"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: changeme
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./certs:/etc/rabbitmq/certs:ro
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq_data:
