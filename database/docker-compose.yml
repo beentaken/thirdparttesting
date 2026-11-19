@@ -132,6 +132,82 @@ services:
       - database-network
 
 
+  # =====================================
+  # Mongo Express (MongoDB UI)
+  # =====================================
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/
+      ME_CONFIG_BASICAUTH: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+    ports:
+      - "8081:8081"
+    networks:
+      - database-network
+
+
+  # =====================================
+  # phpMyAdmin (MySQL + MariaDB)
+  # =====================================
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - mariadb
+    environment:
+      PMA_HOSTS: mysql,mariadb
+      PMA_PORTS: 3306,3306
+      PMA_VERBOSES: MySQL 8.4,MariaDB 11.4
+    ports:
+      - "8080:80"
+    networks:
+      - database-network
+
+
+  # =====================================
+  # pgAdmin (PostgreSQL)
+  # =====================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: change_me
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - database-network
+
+
+  # =====================================
+  # CloudBeaver (web DBeaver: SQL Server, PostgreSQL, MySQL, MariaDB)
+  # =====================================
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:latest
+    container_name: cloudbeaver
+    restart: unless-stopped
+    depends_on:
+      - mssql
+    ports:
+      - "8978:8978"
+    volumes:
+      - cloudbeaver_data:/opt/cloudbeaver/workspace
+    networks:
+      - database-network
+
 # =====================================
 # Persistent volumes
 # =====================================
@@ -141,8 +217,8 @@ volumes:
   mssql_data:
   postgresql_data:
   mariadb_data:
-
-
+  pgadmin_data:
+  cloudbeaver_data:
 # =====================================
 # Docker network
 # =====================================
