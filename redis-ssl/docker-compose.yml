@@ -14,6 +14,33 @@ services:
     networks:
       - redis-network
 
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-insight
+    ports:
+      - "5540:5540"
+    volumes:
+      - ./redis-insight/data:/data
+      - ./redis-ssl/certs:/certs:ro
+    environment:
+      - RI_REDIS_HOST=redis-ssl
+      - RI_REDIS_PORT=6379
+      - RI_REDIS_ALIAS=redis-ssl
+      - RI_REDIS_TLS=true
+      - RI_REDIS_TLS_CA_PATH=/certs/ca.crt
+      # If Redis requires mutual TLS:
+      # - RI_REDIS_TLS_CERT_PATH=/certs/client.crt
+      # - RI_REDIS_TLS_KEY_PATH=/certs/client.key
+      # If Redis requires AUTH:
+      # - RI_REDIS_USERNAME=default
+      # - RI_REDIS_PASSWORD=yourpassword
+      - RI_ACCEPT_TERMS_AND_CONDITIONS=true
+    restart: unless-stopped
+    depends_on:
+      - redis-ssl
+    networks:
+      - redis-network
+
 networks:
   redis-network:
     driver: bridge
