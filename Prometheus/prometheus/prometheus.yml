@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus scraping itself over HTTPS
+  - job_name: prometheus
+    scheme: https
+    tls_config:
+      ca_file: /etc/prometheus/certs/ca.crt
+      server_name: localhost
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Example: another target (uncomment and adjust)
+  # - job_name: node
+  #   scheme: https
+  #   tls_config:
+  #     ca_file: /etc/prometheus/certs/ca.crt
+  #   static_configs:
+  #     - targets: ["node-exporter:9100"]

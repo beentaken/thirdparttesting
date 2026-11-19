@@ -1,0 +1,28 @@
+services:
+  certgen:
+    build: ./certgen
+    container_name: certgen
+    environment:
+      CERT_CN: localhost
+      CERT_SAN: "DNS:localhost,DNS:prometheus,IP:127.0.0.1"
+      CERT_DAYS: "365"
+    volumes:
+      - certs:/certs
+    restart: "no"
+
+  prometheus:
+    build: ./prometheus
+    container_name: prometheus
+    depends_on:
+      certgen:
+        condition: service_completed_successfully
+    ports:
+      - "9090:9090"
+    volumes:
+      - certs:/etc/prometheus/certs:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+
+volumes:
+  certs:
+  prometheus-data:
