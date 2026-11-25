@@ -4,7 +4,7 @@ services:
     container_name: mosquitto
     restart: unless-stopped
     ports:
-      - "8883:8883"
+      - "8883:8883"   # TLS only; 1883 is intentionally not published
     environment:
       CERT_CN: mosquitto
       CERT_SAN: "DNS:mosquitto,DNS:localhost,IP:127.0.0.1"
@@ -12,6 +12,23 @@ services:
     volumes:
       - certs:/mosquitto/certs   # shared cert volume
       - data:/mosquitto/data
+
+  # Web UI: http://localhost:4000
+  # In the UI connect to: mqtt://mosquitto  port 1883  (no TLS needed)
+  mqtt-explorer:
+    image: smeagolworms4/mqtt-explorer
+    container_name: mqtt-explorer
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    ports:
+      - "4000:4000"
+    environment:
+      HTTP_PORT: 4000
+      CONFIG_PATH: /mqtt-explorer/config
+    volumes:
+      - explorer_config:/mqtt-explorer/config
+      - certs:/certs:ro          # CA available here if you want TLS: /certs/ca.crt
 
   # Example consumer of the shared volume (read-only) – remove if not needed
   client:
@@ -27,3 +44,4 @@ services:
 volumes:
   certs:
   data:
+  explorer_config:
