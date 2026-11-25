@@ -1,0 +1,29 @@
+services:
+  mosquitto:
+    build: .
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "8883:8883"
+    environment:
+      CERT_CN: mosquitto
+      CERT_SAN: "DNS:mosquitto,DNS:localhost,IP:127.0.0.1"
+      CERT_DAYS: "365"
+    volumes:
+      - certs:/mosquitto/certs   # shared cert volume
+      - data:/mosquitto/data
+
+  # Example consumer of the shared volume (read-only) – remove if not needed
+  client:
+    image: eclipse-mosquitto:2
+    depends_on:
+      - mosquitto
+    volumes:
+      - certs:/certs:ro
+    command: >
+      sh -c "sleep 5 && mosquitto_sub -h mosquitto -p 8883
+      --cafile /certs/ca.crt -t test/# -v"
+
+volumes:
+  certs:
+  data:
