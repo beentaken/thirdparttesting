@@ -1,12 +1,15 @@
 services:
 
-  # ---- 1. Generate certs inside container, publish to host + volume ----
+  # ---- A) Default: self-signed via openssl ----
   certgen:
     image: alpine:3.20
     container_name: certgen
+    environment:
+      PFX_PASSWORD: ${PFX_PASSWORD:-changeit}
+      EXTRA_IP: ${EXTRA_IP:-172.17.0.1}
     volumes:
-      - ./cert:/out            # bind → host ./cert (inspect / backup)
-      - certs:/certs           # named volume → reused by api & client
+      - .:/out                 # folder containing this compose file (cert/)
+      - certs:/certs
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -18,12 +21,52 @@ services:
           -out    /certs/cert.pem \
           -days 365 \
           -subj "/C=US/ST=State/L=City/O=Org/CN=localhost" \
-          -addext "subjectAltName=DNS:localhost,DNS:api,IP:127.0.0.1"
-        chmod 600 /certs/key.pem
-        # copy into host bind so you can inspect / commit-free backup
-        cp /certs/cert.pem /certs/key.pem /out/
-        echo "✅ certs written to volume 'certs' AND host ./cert"
+          -addext "subjectAltName=DNS:localhost,DNS:api,IP:127.0.0.1,IP:$$EXTRA_IP"
+        openssl pkcs12 -export \
+          -inkey /certs/key.pem -in /certs/cert.pem \
+          -out /certs/cert.pfx -passout pass:"$$PFX_PASSWORD"
+        chmod 644 /certs/key.pem /certs/cert.pem /certs/cert.pfx
+        cp /certs/cert.pem /certs/key.pem /certs/cert.pfx /out/
+        echo "✅ self-signed cert.pem, key.pem, cert.pfx written (openssl)"
+    restart: "no"
+
+  # ---- B) Opt-in: Let's Encrypt via certbot (docker compose --profile certbot up certbot) ----
+  certbot:
+    image: alpine:3.20
+    container_name: certbot
+    profiles: ["certbot"]
+    ports:
+      - "80:80"
+    environment:
+      DOMAIN: ${DOMAIN:-}
+      EMAIL: ${EMAIL:-}
+      PFX_PASSWORD: ${PFX_PASSWORD:-changeit}
+      CERTBOT_EXTRA: ${CERTBOT_EXTRA:-}
+    volumes:
+      - .:/out
+      - certs:/certs
+      - letsencrypt:/etc/letsencrypt
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        : "$${DOMAIN:?set DOMAIN in .env}"
+        : "$${EMAIL:?set EMAIL in .env}"
+        apk add --no-cache certbot openssl >/dev/null
+        mkdir -p /certs /out
+        certbot certonly --standalone --non-interactive --agree-tos \
+          -m "$$EMAIL" -d "$$DOMAIN" $$CERTBOT_EXTRA
+        LIVE=/etc/letsencrypt/live/$$DOMAIN
+        cp "$$LIVE/fullchain.pem" /certs/cert.pem
+        cp "$$LIVE/privkey.pem"   /certs/key.pem
+        openssl pkcs12 -export \
+          -inkey /certs/key.pem -in /certs/cert.pem \
+          -out /certs/cert.pfx -passout pass:"$$PFX_PASSWORD"
+        chmod 644 /certs/key.pem /certs/cert.pem /certs/cert.pfx
+        cp /certs/cert.pem /certs/key.pem /certs/cert.pfx /out/
+        echo "✅ Let's Encrypt cert.pem, key.pem, cert.pfx written (certbot + openssl)"
     restart: "no"
 
 volumes:
   certs:
+  letsencrypt:

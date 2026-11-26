@@ -1,0 +1,7 @@
+PFX_PASSWORD=changeit
+EXTRA_IP=172.17.0.1
+
+# certbot only
+DOMAIN=example.com
+EMAIL=you@example.com
+CERTBOT_EXTRA=--staging
