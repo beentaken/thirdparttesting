@@ -8,7 +8,7 @@ services:
       PFX_PASSWORD: ${PFX_PASSWORD:-changeit}
       EXTRA_IP: ${EXTRA_IP:-172.17.0.1}
     volumes:
-      - .:/out                 # folder containing this compose file (cert/)
+      - ./certout:/out         # all cert files land in certout/ next to this compose file
       - certs:/certs
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -27,7 +27,7 @@ services:
           -out /certs/cert.pfx -passout pass:"$$PFX_PASSWORD"
         chmod 644 /certs/key.pem /certs/cert.pem /certs/cert.pfx
         cp /certs/cert.pem /certs/key.pem /certs/cert.pfx /out/
-        echo "✅ self-signed cert.pem, key.pem, cert.pfx written (openssl)"
+        echo "✅ self-signed cert.pem, key.pem, cert.pfx written to certout/ (openssl)"
     restart: "no"
 
   # ---- B) Opt-in: Let's Encrypt via certbot (docker compose --profile certbot up certbot) ----
@@ -43,7 +43,7 @@ services:
       PFX_PASSWORD: ${PFX_PASSWORD:-changeit}
       CERTBOT_EXTRA: ${CERTBOT_EXTRA:-}
     volumes:
-      - .:/out
+      - ./certout:/out
       - certs:/certs
       - letsencrypt:/etc/letsencrypt
     entrypoint: ["/bin/sh", "-c"]
@@ -64,7 +64,7 @@ services:
           -out /certs/cert.pfx -passout pass:"$$PFX_PASSWORD"
         chmod 644 /certs/key.pem /certs/cert.pem /certs/cert.pfx
         cp /certs/cert.pem /certs/key.pem /certs/cert.pfx /out/
-        echo "✅ Let's Encrypt cert.pem, key.pem, cert.pfx written (certbot + openssl)"
+        echo "✅ Let's Encrypt cert.pem, key.pem, cert.pfx written to certout/ (certbot + openssl)"
     restart: "no"
 
 volumes:

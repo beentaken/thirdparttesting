@@ -2,3 +2,4 @@ Grafana-ssl/cert/*
 *.pem
 *.crt
 *.key
+*.pfx
