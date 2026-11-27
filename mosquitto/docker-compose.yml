@@ -9,6 +9,7 @@ services:
       CERT_CN: mosquitto
       CERT_SAN: "DNS:mosquitto,DNS:localhost,IP:127.0.0.1"
       CERT_DAYS: "365"
+      CERT_PFX_PASSWORD: "changeit"
     volumes:
       - certs:/mosquitto/certs   # shared cert volume
       - data:/mosquitto/data
@@ -28,7 +29,25 @@ services:
       CONFIG_PATH: /mqtt-explorer/config
     volumes:
       - explorer_config:/mqtt-explorer/config
-      - certs:/certs:ro          # CA available here if you want TLS: /certs/ca.crt
+      - certs:/certs:ro
+
+  # One-shot: copies certs to ./certout on the host, then exits
+  cert-export:
+    image: alpine:3
+    container_name: cert-export
+    restart: "no"
+    depends_on:
+      - mosquitto
+    volumes:
+      - certs:/certs:ro
+      - ./certout:/out
+    command:
+      - sh
+      - -c
+      - |
+        while [ ! -f /certs/cert.pfx ]; do sleep 1; done
+        cp /certs/ca.crt /certs/cert.pem /certs/key.pem /certs/cert.pfx /out/
+        echo "Exported to ./certout"
 
   # Example consumer of the shared volume (read-only) – remove if not needed
   client:

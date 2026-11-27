@@ -5,12 +5,13 @@ CERT_DIR="${CERT_DIR:-/mosquitto/certs}"
 CERT_CN="${CERT_CN:-mosquitto}"
 CERT_SAN="${CERT_SAN:-DNS:mosquitto,DNS:localhost,IP:127.0.0.1}"
 CERT_DAYS="${CERT_DAYS:-365}"
+CERT_PFX_PASSWORD="${CERT_PFX_PASSWORD:-changeit}"
 
 mkdir -p "$CERT_DIR"
+cd "$CERT_DIR"
 
-if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then
+if [ ! -f server.crt ] || [ ! -f server.key ]; then
   echo "[entrypoint] Generating CA and server certificate in $CERT_DIR"
-  cd "$CERT_DIR"
 
   # CA
   openssl genrsa -out ca.key 4096
@@ -32,6 +33,18 @@ if [ ! -f "$CERT_DIR/server.crt" ] || [ ! -f "$CERT_DIR/server.key" ]; then
   chmod 644 ca.crt server.crt
 else
   echo "[entrypoint] Existing certificates found, skipping generation"
+fi
+
+# Derived copies for other apps (cert.pem, key.pem, cert.pfx).
+# Created separately so they also appear on existing volumes.
+if [ ! -f cert.pfx ]; then
+  echo "[entrypoint] Creating cert.pem, key.pem, cert.pfx"
+  cp server.crt cert.pem
+  cp server.key key.pem
+  openssl pkcs12 -export -out cert.pfx \
+    -inkey server.key -in server.crt -certfile ca.crt \
+    -passout "pass:${CERT_PFX_PASSWORD}"
+  chmod 644 cert.pem key.pem cert.pfx   # dev convenience: key.pem is world-readable
 fi
 
 exec "$@"
