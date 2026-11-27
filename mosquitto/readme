@@ -1,0 +1,27 @@
+
+2. Open the UI
+
+Go to http://localhost:4000. A connection dialog opens on first load.
+
+3. Fill in the connection
+
+Field	Value
+Name	local (anything)
+Protocol	mqtt://
+Host	mosquitto
+Port	1883
+Username / Password	leave blank
+Validate certificate	off
+Encryption (TLS)	off
+
+Use mosquitto as the host, not localhost. The UI runs in its own container, so localhost would point at itself.
+
+Click Save (the settings persist in the explorer_config volume), then Connect.
+
+4. Check that it works
+
+A $SYS branch should appear in the topic tree on the left. It holds the broker's own stats.
+In the Publish panel on the right, enter topic test/hello, type a message, and click Publish. A test branch appears in the tree with your message.
+Your client container, which subscribes to test/#, will also print it: docker logs -f <client-container-name>.
+
+5. Optional: connect with TLS instead
