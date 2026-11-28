@@ -1,0 +1,76 @@
+services:
+  mosquitto:
+    build: .
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "8883:8883"   # TLS only; 1883 is intentionally not published
+    environment:
+      CERT_CN: mosquitto
+      CERT_SAN: "DNS:mosquitto,DNS:localhost,IP:127.0.0.1"
+      CERT_DAYS: "365"
+      CERT_PFX_PASSWORD: "changeit"
+    volumes:
+      - certs:/mosquitto/certs   # shared cert volume
+      - data:/mosquitto/data
+    networks:
+      - mqtt-network
+  # Web UI: http://localhost:4000
+  # In the UI connect to: mqtt://mosquitto  port 1883  (no TLS needed)
+  mqtt-explorer:
+    image: smeagolworms4/mqtt-explorer
+    container_name: mqtt-explorer
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    ports:
+      - "4000:4000"
+    environment:
+      HTTP_PORT: 4000
+      CONFIG_PATH: /mqtt-explorer/config
+    volumes:
+      - explorer_config:/mqtt-explorer/config
+      - certs:/certs:ro
+    networks:
+      - mqtt-network
+  # One-shot: copies certs to ./certout on the host, then exits
+  cert-export:
+    image: alpine:3
+    container_name: cert-export
+    restart: "no"
+    depends_on:
+      - mosquitto
+    volumes:
+      - certs:/certs:ro
+      - ./certout:/out
+    command:
+      - sh
+      - -c
+      - |
+        while [ ! -f /certs/cert.pfx ]; do sleep 1; done
+        cp /certs/ca.crt /certs/cert.pem /certs/key.pem /certs/cert.pfx /out/
+        echo "Exported to ./certout"
+    networks:
+      - mqtt-network
+
+  # Example consumer of the shared volume (read-only) – remove if not needed
+  client:
+    image: eclipse-mosquitto:2
+    # depends_on:
+    #   - mosquitto
+    # volumes:
+    #   - certs:/certs:ro
+    command: >
+      sh -c "sleep 5 && mosquitto_sub -h mqtt -p 1883 -t aqi/sensors/# -v"
+    networks:
+      - mqtt-network
+
+volumes:
+  certs:
+  data:
+  explorer_config:
+
+networks:
+  mqtt-network:
+    name: mqtt-network
+    driver: bridge  
